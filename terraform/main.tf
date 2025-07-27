@@ -2,15 +2,13 @@ provider "aws" {
   region = "ap-southeast-2"
 }
 
-# ✅ 1. Key Pair (Correct file path using double backslashes or forward slashes)
 resource "aws_key_pair" "deployer" {
-  key_name   = "ec2-key"
-  public_key = file("C:/Users/admin/.ssh/id_rsa.pub")  # or "C:\\Users\\admin\\.ssh\\id_rsa.pub"
+  key_name   = "ec2-key"  # Or "ec2-key-new" if duplicate error persists
+  public_key = file("C:/Users/admin/.ssh/id_rsa.pub")
 }
 
-# ✅ 2. Security Group for port 8000 + SSH
 resource "aws_security_group" "allow_http" {
-  name        = "allow_http"
+  name        = "allow_http"  # Or "allow_http_new" if duplicate error persists
   description = "Allow HTTP (8000) and SSH"
 
   ingress {
@@ -35,9 +33,8 @@ resource "aws_security_group" "allow_http" {
   }
 }
 
-# ✅ 3. EC2 Instance using proper key and security group reference
 resource "aws_instance" "docker_app" {
-  ami           = "ami-010876b9ddd38475e" # This is in ap-south-1; use correct AMI for ap-southeast-2
+  ami           = "ami-04f5097681773b989"  # Use valid AMI for ap-southeast-2
   instance_type = "t2.micro"
 
   key_name               = aws_key_pair.deployer.key_name
@@ -48,10 +45,18 @@ resource "aws_instance" "docker_app" {
   tags = {
     Name = "DockerAppAutoDeploy"
   }
+
+  depends_on = [
+    aws_key_pair.deployer,
+    aws_security_group.allow_http
+  ]
 }
 
-# ✅ 4. Output the public IP
 output "instance_public_ip" {
   description = "Public IP of the EC2 instance"
   value       = aws_instance.docker_app.public_ip
+}
+
+output "ssh_connection_command" {
+  value = "ssh -i ~/.ssh/id_rsa ec2-user@${aws_instance.docker_app.public_ip}"
 }
