@@ -3,13 +3,13 @@ provider "aws" {
 }
 
 resource "aws_key_pair" "deployer" {
-  key_name   = "ec2-key"  # Or "ec2-key-new" if duplicate error persists
-  public_key = file("C:/Users/admin/.ssh/id_rsa.pub")
+  key_name   = "ec2-key-${formatdate("YYYYMMDD", timestamp())}"
+  public_key = file("~/.ssh/id_rsa.pub")
 }
 
-resource "aws_security_group" "allow_http" {
-  name        = "allow_http"  # Or "allow_http_new" if duplicate error persists
-  description = "Allow HTTP (8000) and SSH"
+resource "aws_security_group" "app_sg" {
+  name        = "flask-app-sg-${formatdate("YYYYMMDD", timestamp())}"
+  description = "Allow HTTP and SSH traffic"
 
   ingress {
     from_port   = 8000
@@ -33,30 +33,31 @@ resource "aws_security_group" "allow_http" {
   }
 }
 
-resource "aws_instance" "docker_app" {
-  ami           = "ami-04f5097681773b989"  # Use valid AMI for ap-southeast-2
+resource "aws_instance" "app_server" {
+  ami           = "ami-0c55b159cbfafe1f0" # Ubuntu 20.04 LTS
   instance_type = "t2.micro"
+  key_name      = aws_key_pair.deployer.key_name
+  vpc_security_group_ids = [aws_security_group.app_sg.id]
 
-  key_name               = aws_key_pair.deployer.key_name
-  vpc_security_group_ids = [aws_security_group.allow_http.id]
-
-  user_data = file("${path.module}/user_data.sh")
+  user_data = <<-EOF
+              #!/bin/bash
+              apt update -y
+              apt install -y docker.io
+              systemctl start docker
+              usermod -aG docker ubuntu
+              docker pull sakthirangasamy/flask-docker-app
+              docker run -d -p 8000:8000 sakthirangasamy/flask-docker-app
+              EOF
 
   tags = {
-    Name = "DockerAppAutoDeploy"
+    Name = "FlaskAppServer"
   }
-
-  depends_on = [
-    aws_key_pair.deployer,
-    aws_security_group.allow_http
-  ]
 }
 
-output "instance_public_ip" {
-  description = "Public IP of the EC2 instance"
-  value       = aws_instance.docker_app.public_ip
+output "app_url" {
+  value = "http://${aws_instance.app_server.public_ip}:8000"
 }
 
-output "ssh_connection_command" {
-  value = "ssh -i ~/.ssh/id_rsa ec2-user@${aws_instance.docker_app.public_ip}"
+output "ssh_command" {
+  value = "ssh -i ~/.ssh/id_rsa ubuntu@${aws_instance.app_server.public_ip}"
 }
