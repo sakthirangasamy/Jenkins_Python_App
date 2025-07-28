@@ -35,7 +35,7 @@ resource "aws_security_group" "app_sg" {
 }
 
 resource "aws_instance" "app_server" {
-  ami           = "ami-0c55b159cbfafe1f0" # Ubuntu 20.04 LTS
+  ami           = "ami-010876b9ddd38475e" # Ubuntu 20.04 LTS
   instance_type = "t2.micro"
   key_name      = aws_key_pair.deployer.key_name
   vpc_security_group_ids = [aws_security_group.app_sg.id]
